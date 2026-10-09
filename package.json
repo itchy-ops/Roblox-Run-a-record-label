@@ -1,0 +1,13 @@
+{
+  "name": "record-label-game",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "node tests/syntax.cjs && fengari tests/economy.lua && fengari tests/server.lua && fengari tests/persistence.lua",
+    "build": ".tools/rojo build default.project.json -o build/RecordLabel.rbxlx"
+  },
+  "devDependencies": {
+    "fengari-node-cli": "0.1.0",
+    "luaparse": "0.3.1"
+  }
+}
