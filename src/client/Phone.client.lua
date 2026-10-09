@@ -56,7 +56,7 @@ local function request(verb, args, redraw)
     if not response.ok then notice.Text = response.message or "Action failed."
     elseif verb ~= "State" then notice.Text = state and state.messages[1] or "Done." end
     if state then
-        local desk = workspace:FindFirstChild("Battered mixing desk")
+        local desk = workspace:FindFirstChild("Battered mixing desk", true)
         if desk then desk.Color = state.studio > 0 and Color3.fromRGB(102, 91, 173) or Color3.fromRGB(75, 65, 57) end
         status.Text = string.format("$%s  |  Studio %d  |  Scouting %d  |  Slots %d\n%s", state.cash, state.studio, state.scout, state.capacity,
             state.saving and "Progress saving enabled" or "PRACTICE MODE — progress will not save")

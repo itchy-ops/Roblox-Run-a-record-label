@@ -88,4 +88,18 @@ check(not Other.load(5, newProfile()), 'pending active trade blocks unsafe recov
 fail = true
 check(not Store.save(4, newProfile(), false), 'failed storage is reported')
 check(not Store.load(10, newProfile()), 'live load failure never falls back to empty profile')
+-- An unpublished Studio place can throw during GetDataStore itself.
+-- Importing modules must still work, and load must enter explicit practice mode.
+fail = false
+DS.GetDataStore = function() error('You must publish this place to access DataStore') end
+services.RunService.IsStudio = function() return true end
+game.JobId = ''
+local UnpublishedTrade = dofile('src/server/TradeStore.lua')
+check(UnpublishedTrade ~= nil, 'trade module loads without accessing DataStore')
+require = function(name) return name == 'Trade' and UnpublishedTrade or Settlement end
+local UnpublishedStore = dofile('src/server/ProfileStore.lua')
+check(UnpublishedStore ~= nil, 'profile module loads without accessing DataStore')
+local practice, isSaved = UnpublishedStore.load(99, newProfile())
+check(practice and practice.cash == 5000 and not isSaved, 'unpublished Studio uses unsaved practice mode')
+check(not UnpublishedTrade.begin(1, 2), 'unavailable trade storage returns failure without throwing')
 print('Persistence: ' .. count .. ' checks passed')

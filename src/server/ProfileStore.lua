@@ -1,7 +1,11 @@
 local DataStoreService = game:GetService("DataStoreService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
-local store = DataStoreService:GetDataStore("RecordLabel_v1")
+local store
+local function getStore()
+    if not store then store = DataStoreService:GetDataStore("RecordLabel_v1") end
+    return store
+end
 local Trade = require(script.Parent.TradeStore)
 local Settlement = require(script.Parent.Settlement)
 local Store = {}
@@ -10,7 +14,7 @@ local function key(id) return "player_" .. id end
 function Store.load(id, defaults)
     local result
     local ok, err = pcall(function()
-        result = store:UpdateAsync(key(id), function(old)
+        result = getStore():UpdateAsync(key(id), function(old)
             if old and old.lock and old.lock.session ~= session and old.lock.expires > os.time() then
                 return nil
             end
@@ -41,7 +45,7 @@ end
 function Store.save(id, data, release)
     local result
     local ok, err = pcall(function()
-        result = store:UpdateAsync(key(id), function(old)
+        result = getStore():UpdateAsync(key(id), function(old)
             if not old or not old.lock or old.lock.session ~= session then return nil end
             return {data = data, lock = not release and {session = session, expires = os.time() + 180} or nil}
         end)

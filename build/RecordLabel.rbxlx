@@ -391,45 +391,25 @@ task.spawn(function()
         for id, bid in pairs(bids) do if bid.expires <= os.time() then bids[id] = nil end end
     end
 end)
-local function part(name, size, pos, color)
-    local obj = Instance.new("Part")
-    obj.Name, obj.Size, obj.Position, obj.Color = name, size, pos, color
-    obj.Anchored = true; obj.TopSurface = Enum.SurfaceType.Smooth; obj.Parent = workspace
-    return obj
-end
-part("Town Ground", Vector3.new(240, 1, 240), Vector3.new(0, -1, 0), Color3.fromRGB(63, 91, 77))
-part("Main Street", Vector3.new(22, 0.2, 200), Vector3.new(0, -0.35, 0), Color3.fromRGB(42, 44, 54))
-local spawn = Instance.new("SpawnLocation")
-spawn.Position = Vector3.new(0, 1, 65); spawn.Anchored = true; spawn.Neutral = true; spawn.Parent = workspace
-local locations = {{"Your Studio", Vector3.new(-40, 0, 45)}, {"Open Mic", Vector3.new(40, 0, 25)},
-    {"Park Stage", Vector3.new(-40, 0, -25)}, {"Music Cafe", Vector3.new(40, 0, -55)}}
-for i, entry in ipairs(locations) do
-    local name, pos = entry[1], entry[2]
-    local floor = part(name, Vector3.new(30, 1, 26), pos, Color3.fromRGB(65 + i * 20, 62, 94))
-    part(name .. " rear wall", Vector3.new(30, 12, 1), pos + Vector3.new(0, 6, -13), Color3.fromRGB(44, 49, 65))
-    for _, x in ipairs({-15, 15}) do part(name .. " wall", Vector3.new(1, 12, 26), pos + Vector3.new(x, 6, 0), Color3.fromRGB(44, 49, 65)) end
-    local sign = Instance.new("BillboardGui")
-    sign.Size = UDim2.fromOffset(220, 50); sign.StudsOffset = Vector3.new(0, 13, 0); sign.AlwaysOnTop = true; sign.Parent = floor
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1, 1); label.BackgroundTransparency = 1; label.Text = name
-    label.TextColor3 = Color3.new(1, 1, 1); label.TextScaled = true; label.Parent = sign
-    local booth = part(name .. " booth", Vector3.new(5, 3, 3), pos + Vector3.new(0, 2, -7), Color3.fromRGB(117, 82, 165))
-    local prompt = Instance.new("ProximityPrompt")
-    prompt.ActionText = i == 1 and "Check studio" or "Discover local talent"
-    prompt.ObjectText = name; prompt.MaxActivationDistance = 10; prompt.Parent = booth
+-- The town is serialized in Workspace, so it also appears in Studio edit mode.
+local town = workspace:WaitForChild("Town")
+for index, name in ipairs({"Your Studio", "Open Mic", "Park Stage", "Music Cafe"}) do
+    local booth = town:WaitForChild(name .. " booth")
+    local prompt = booth:WaitForChild("ProximityPrompt")
     prompt.Triggered:Connect(function(player)
         local p = profiles[player]; if not p then return end
-        if i == 1 then note(p, "Studio level " .. p.studio .. ". Open your phone to repair and manage artists."); return end
         local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
         if not root or (root.Position - booth.Position).Magnitude > 15 then return end
+        if index == 1 then
+            note(p, "Studio level " .. p.studio .. ". Open your phone to repair and manage artists.")
+            return
+        end
         local n = 0
-        for _, a in ipairs(p.artists) do if a.location == name and not a.discovered then a.discovered = true; n = n + 1 end end
+        for _, a in ipairs(p.artists) do
+            if a.location == name and not a.discovered then a.discovered = true; n = n + 1 end
+        end
         note(p, "Discovered " .. n .. " artists at " .. name .. ". Open your phone.")
     end)
-    if i == 1 then
-        part("Battered mixing desk", Vector3.new(8, 2, 4), pos + Vector3.new(-7, 2, 3), Color3.fromRGB(75, 65, 57))
-        part("Old microphone", Vector3.new(0.4, 5, 0.4), pos + Vector3.new(7, 3, 0), Color3.fromRGB(105, 105, 105))
-    end
 end
 ]]></string>
         </Properties>
@@ -440,7 +420,11 @@ end
           <string name="Source"><![CDATA[local DataStoreService = game:GetService("DataStoreService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
-local store = DataStoreService:GetDataStore("RecordLabel_v1")
+local store
+local function getStore()
+    if not store then store = DataStoreService:GetDataStore("RecordLabel_v1") end
+    return store
+end
 local Trade = require(script.Parent.TradeStore)
 local Settlement = require(script.Parent.Settlement)
 local Store = {}
@@ -449,7 +433,7 @@ local function key(id) return "player_" .. id end
 function Store.load(id, defaults)
     local result
     local ok, err = pcall(function()
-        result = store:UpdateAsync(key(id), function(old)
+        result = getStore():UpdateAsync(key(id), function(old)
             if old and old.lock and old.lock.session ~= session and old.lock.expires > os.time() then
                 return nil
             end
@@ -480,7 +464,7 @@ end
 function Store.save(id, data, release)
     local result
     local ok, err = pcall(function()
-        result = store:UpdateAsync(key(id), function(old)
+        result = getStore():UpdateAsync(key(id), function(old)
             if not old or not old.lock or old.lock.session ~= session then return nil end
             return {data = data, lock = not release and {session = session, expires = os.time() + 180} or nil}
         end)
@@ -525,12 +509,16 @@ return Settlement
 -- artist are reserved before commitment; profile loading resolves interrupted trades.
 local DS = game:GetService("DataStoreService")
 local Http = game:GetService("HttpService")
-local journal = DS:GetDataStore("RecordLabel_trades_v1")
+local journal
+local function getJournal()
+    if not journal then journal = DS:GetDataStore("RecordLabel_trades_v1") end
+    return journal
+end
 local Trade = {}
 function Trade.begin(buyer, seller)
     local id = Http:GenerateGUID(false)
     local ok, result = pcall(function()
-        return journal:UpdateAsync(id, function(old)
+        return getJournal():UpdateAsync(id, function(old)
             if old then return nil end
             return {status = "pending", buyer = buyer, seller = seller, expires = os.time() + 120}
         end)
@@ -540,7 +528,7 @@ function Trade.begin(buyer, seller)
 end
 function Trade.finish(id, desired)
     local ok, result = pcall(function()
-        return journal:UpdateAsync(id, function(old)
+        return getJournal():UpdateAsync(id, function(old)
             if not old then return nil end
             if old.status == "pending" then
                 old.status = desired == "committed" and old.expires > os.time() and "committed" or "aborted"
@@ -551,7 +539,7 @@ function Trade.finish(id, desired)
     return ok and result and result.status or nil
 end
 function Trade.status(id)
-    local ok, result = pcall(function() return journal:GetAsync(id) end)
+    local ok, result = pcall(function() return getJournal():GetAsync(id) end)
     if not ok or not result then return nil end
     if result.status == "pending" and result.expires <= os.time() then return Trade.finish(id, "aborted") end
     return result.status
@@ -635,7 +623,7 @@ local function request(verb, args, redraw)
     if not response.ok then notice.Text = response.message or "Action failed."
     elseif verb ~= "State" then notice.Text = state and state.messages[1] or "Done." end
     if state then
-        local desk = workspace:FindFirstChild("Battered mixing desk")
+        local desk = workspace:FindFirstChild("Battered mixing desk", true)
         if desk then desk.Color = state.studio > 0 and Color3.fromRGB(102, 91, 173) or Color3.fromRGB(75, 65, 57) end
         status.Text = string.format("$%s  |  Studio %d  |  Scouting %d  |  Slots %d\n%s", state.cash, state.studio, state.scout, state.capacity,
             state.saving and "Progress saving enabled" or "PRACTICE MODE — progress will not save")
@@ -763,5 +751,1117 @@ end)
       <bool name="FilteringEnabled">true</bool>
       <bool name="NeedsPivotMigration">false</bool>
     </Properties>
+    <Item class="Model" referent="16">
+      <Properties>
+        <string name="Name">Town</string>
+        <bool name="NeedsPivotMigration">false</bool>
+      </Properties>
+      <Item class="Part" referent="17">
+        <Properties>
+          <string name="Name">Town Ground</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>0</X>
+            <Y>-1</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">4152141</Color3uint8>
+          <Vector3 name="size">
+            <X>240</X>
+            <Y>1</Y>
+            <Z>240</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="18">
+        <Properties>
+          <string name="Name">Main Street</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>0</X>
+            <Y>-0.35</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2763830</Color3uint8>
+          <Vector3 name="size">
+            <X>22</X>
+            <Y>0.2</Y>
+            <Z>200</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="SpawnLocation" referent="19">
+        <Properties>
+          <string name="Name">Town Spawn</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>0</X>
+            <Y>1</Y>
+            <Z>65</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">7361237</Color3uint8>
+          <float name="Duration">0</float>
+          <bool name="Neutral">true</bool>
+          <Vector3 name="size">
+            <X>8</X>
+            <Y>1</Y>
+            <Z>8</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="20">
+        <Properties>
+          <string name="Name">Your Studio</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-40</X>
+            <Y>0</Y>
+            <Z>45</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">5586526</Color3uint8>
+          <Vector3 name="size">
+            <X>30</X>
+            <Y>1</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+        <Item class="BillboardGui" referent="21">
+          <Properties>
+            <string name="Name">Location Sign</string>
+            <bool name="AlwaysOnTop">true</bool>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>220</XO>
+              <YS>0</YS>
+              <YO>50</YO>
+            </UDim2>
+            <Vector3 name="StudsOffset">
+              <X>0</X>
+              <Y>13</Y>
+              <Z>0</Z>
+            </Vector3>
+          </Properties>
+          <Item class="TextLabel" referent="22">
+            <Properties>
+              <string name="Name">Title</string>
+              <float name="BackgroundTransparency">1</float>
+              <UDim2 name="Size">
+                <XS>1</XS>
+                <XO>0</XO>
+                <YS>1</YS>
+                <YO>0</YO>
+              </UDim2>
+              <string name="Text">Your Studio</string>
+              <Color3 name="TextColor3">
+                <R>1</R>
+                <G>1</G>
+                <B>1</B>
+              </Color3>
+              <bool name="TextScaled">true</bool>
+            </Properties>
+          </Item>
+        </Item>
+      </Item>
+      <Item class="Part" referent="23">
+        <Properties>
+          <string name="Name">Your Studio rear wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-40</X>
+            <Y>6</Y>
+            <Z>32</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>30</X>
+            <Y>12</Y>
+            <Z>1</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="24">
+        <Properties>
+          <string name="Name">Your Studio left wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-55</X>
+            <Y>6</Y>
+            <Z>45</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>1</X>
+            <Y>12</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="25">
+        <Properties>
+          <string name="Name">Your Studio right wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-25</X>
+            <Y>6</Y>
+            <Z>45</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>1</X>
+            <Y>12</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="26">
+        <Properties>
+          <string name="Name">Your Studio path</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-20</X>
+            <Y>-0.25</Y>
+            <Z>53</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">9211799</Color3uint8>
+          <Vector3 name="size">
+            <X>18</X>
+            <Y>0.2</Y>
+            <Z>8</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="27">
+        <Properties>
+          <string name="Name">Your Studio booth</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-40</X>
+            <Y>2</Y>
+            <Z>38</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">7688869</Color3uint8>
+          <Vector3 name="size">
+            <X>5</X>
+            <Y>3</Y>
+            <Z>3</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+        <Item class="ProximityPrompt" referent="28">
+          <Properties>
+            <string name="Name">ProximityPrompt</string>
+            <string name="ActionText">Check studio</string>
+            <float name="MaxActivationDistance">10</float>
+            <string name="ObjectText">Your Studio</string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="Part" referent="29">
+        <Properties>
+          <string name="Name">Battered mixing desk</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-47</X>
+            <Y>2</Y>
+            <Z>48</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">4931897</Color3uint8>
+          <Vector3 name="size">
+            <X>8</X>
+            <Y>2</Y>
+            <Z>4</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="30">
+        <Properties>
+          <string name="Name">Old microphone</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-33</X>
+            <Y>3</Y>
+            <Z>45</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">6908265</Color3uint8>
+          <Vector3 name="size">
+            <X>0.4</X>
+            <Y>5</Y>
+            <Z>0.4</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="31">
+        <Properties>
+          <string name="Name">Open Mic</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>40</X>
+            <Y>0</Y>
+            <Z>25</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">6897246</Color3uint8>
+          <Vector3 name="size">
+            <X>30</X>
+            <Y>1</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+        <Item class="BillboardGui" referent="32">
+          <Properties>
+            <string name="Name">Location Sign</string>
+            <bool name="AlwaysOnTop">true</bool>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>220</XO>
+              <YS>0</YS>
+              <YO>50</YO>
+            </UDim2>
+            <Vector3 name="StudsOffset">
+              <X>0</X>
+              <Y>13</Y>
+              <Z>0</Z>
+            </Vector3>
+          </Properties>
+          <Item class="TextLabel" referent="33">
+            <Properties>
+              <string name="Name">Title</string>
+              <float name="BackgroundTransparency">1</float>
+              <UDim2 name="Size">
+                <XS>1</XS>
+                <XO>0</XO>
+                <YS>1</YS>
+                <YO>0</YO>
+              </UDim2>
+              <string name="Text">Open Mic</string>
+              <Color3 name="TextColor3">
+                <R>1</R>
+                <G>1</G>
+                <B>1</B>
+              </Color3>
+              <bool name="TextScaled">true</bool>
+            </Properties>
+          </Item>
+        </Item>
+      </Item>
+      <Item class="Part" referent="34">
+        <Properties>
+          <string name="Name">Open Mic rear wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>40</X>
+            <Y>6</Y>
+            <Z>12</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>30</X>
+            <Y>12</Y>
+            <Z>1</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="35">
+        <Properties>
+          <string name="Name">Open Mic left wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>25</X>
+            <Y>6</Y>
+            <Z>25</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>1</X>
+            <Y>12</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="36">
+        <Properties>
+          <string name="Name">Open Mic right wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>55</X>
+            <Y>6</Y>
+            <Z>25</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>1</X>
+            <Y>12</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="37">
+        <Properties>
+          <string name="Name">Open Mic path</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>20</X>
+            <Y>-0.25</Y>
+            <Z>33</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">9211799</Color3uint8>
+          <Vector3 name="size">
+            <X>18</X>
+            <Y>0.2</Y>
+            <Z>8</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="38">
+        <Properties>
+          <string name="Name">Open Mic booth</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>40</X>
+            <Y>2</Y>
+            <Z>18</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">7688869</Color3uint8>
+          <Vector3 name="size">
+            <X>5</X>
+            <Y>3</Y>
+            <Z>3</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+        <Item class="ProximityPrompt" referent="39">
+          <Properties>
+            <string name="Name">ProximityPrompt</string>
+            <string name="ActionText">Discover local talent</string>
+            <float name="MaxActivationDistance">10</float>
+            <string name="ObjectText">Open Mic</string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="Part" referent="40">
+        <Properties>
+          <string name="Name">Open Mic stage</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>40</X>
+            <Y>1</Y>
+            <Z>21</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">6181491</Color3uint8>
+          <Vector3 name="size">
+            <X>12</X>
+            <Y>1</Y>
+            <Z>6</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="41">
+        <Properties>
+          <string name="Name">Park Stage</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-40</X>
+            <Y>0</Y>
+            <Z>-25</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">8207966</Color3uint8>
+          <Vector3 name="size">
+            <X>30</X>
+            <Y>1</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+        <Item class="BillboardGui" referent="42">
+          <Properties>
+            <string name="Name">Location Sign</string>
+            <bool name="AlwaysOnTop">true</bool>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>220</XO>
+              <YS>0</YS>
+              <YO>50</YO>
+            </UDim2>
+            <Vector3 name="StudsOffset">
+              <X>0</X>
+              <Y>13</Y>
+              <Z>0</Z>
+            </Vector3>
+          </Properties>
+          <Item class="TextLabel" referent="43">
+            <Properties>
+              <string name="Name">Title</string>
+              <float name="BackgroundTransparency">1</float>
+              <UDim2 name="Size">
+                <XS>1</XS>
+                <XO>0</XO>
+                <YS>1</YS>
+                <YO>0</YO>
+              </UDim2>
+              <string name="Text">Park Stage</string>
+              <Color3 name="TextColor3">
+                <R>1</R>
+                <G>1</G>
+                <B>1</B>
+              </Color3>
+              <bool name="TextScaled">true</bool>
+            </Properties>
+          </Item>
+        </Item>
+      </Item>
+      <Item class="Part" referent="44">
+        <Properties>
+          <string name="Name">Park Stage rear wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-40</X>
+            <Y>6</Y>
+            <Z>-38</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>30</X>
+            <Y>12</Y>
+            <Z>1</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="45">
+        <Properties>
+          <string name="Name">Park Stage left wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-55</X>
+            <Y>6</Y>
+            <Z>-25</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>1</X>
+            <Y>12</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="46">
+        <Properties>
+          <string name="Name">Park Stage right wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-25</X>
+            <Y>6</Y>
+            <Z>-25</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>1</X>
+            <Y>12</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="47">
+        <Properties>
+          <string name="Name">Park Stage path</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-20</X>
+            <Y>-0.25</Y>
+            <Z>-17</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">9211799</Color3uint8>
+          <Vector3 name="size">
+            <X>18</X>
+            <Y>0.2</Y>
+            <Z>8</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="48">
+        <Properties>
+          <string name="Name">Park Stage booth</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-40</X>
+            <Y>2</Y>
+            <Z>-32</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">7688869</Color3uint8>
+          <Vector3 name="size">
+            <X>5</X>
+            <Y>3</Y>
+            <Z>3</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+        <Item class="ProximityPrompt" referent="49">
+          <Properties>
+            <string name="Name">ProximityPrompt</string>
+            <string name="ActionText">Discover local talent</string>
+            <float name="MaxActivationDistance">10</float>
+            <string name="ObjectText">Park Stage</string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="Part" referent="50">
+        <Properties>
+          <string name="Name">Park Stage stage</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>-40</X>
+            <Y>1</Y>
+            <Z>-29</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">6181491</Color3uint8>
+          <Vector3 name="size">
+            <X>12</X>
+            <Y>1</Y>
+            <Z>6</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="51">
+        <Properties>
+          <string name="Name">Music Cafe</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>40</X>
+            <Y>0</Y>
+            <Z>-55</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">9518686</Color3uint8>
+          <Vector3 name="size">
+            <X>30</X>
+            <Y>1</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+        <Item class="BillboardGui" referent="52">
+          <Properties>
+            <string name="Name">Location Sign</string>
+            <bool name="AlwaysOnTop">true</bool>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>220</XO>
+              <YS>0</YS>
+              <YO>50</YO>
+            </UDim2>
+            <Vector3 name="StudsOffset">
+              <X>0</X>
+              <Y>13</Y>
+              <Z>0</Z>
+            </Vector3>
+          </Properties>
+          <Item class="TextLabel" referent="53">
+            <Properties>
+              <string name="Name">Title</string>
+              <float name="BackgroundTransparency">1</float>
+              <UDim2 name="Size">
+                <XS>1</XS>
+                <XO>0</XO>
+                <YS>1</YS>
+                <YO>0</YO>
+              </UDim2>
+              <string name="Text">Music Cafe</string>
+              <Color3 name="TextColor3">
+                <R>1</R>
+                <G>1</G>
+                <B>1</B>
+              </Color3>
+              <bool name="TextScaled">true</bool>
+            </Properties>
+          </Item>
+        </Item>
+      </Item>
+      <Item class="Part" referent="54">
+        <Properties>
+          <string name="Name">Music Cafe rear wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>40</X>
+            <Y>6</Y>
+            <Z>-68</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>30</X>
+            <Y>12</Y>
+            <Z>1</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="55">
+        <Properties>
+          <string name="Name">Music Cafe left wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>25</X>
+            <Y>6</Y>
+            <Z>-55</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>1</X>
+            <Y>12</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="56">
+        <Properties>
+          <string name="Name">Music Cafe right wall</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>55</X>
+            <Y>6</Y>
+            <Z>-55</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">2896193</Color3uint8>
+          <Vector3 name="size">
+            <X>1</X>
+            <Y>12</Y>
+            <Z>26</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="57">
+        <Properties>
+          <string name="Name">Music Cafe path</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>20</X>
+            <Y>-0.25</Y>
+            <Z>-47</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">9211799</Color3uint8>
+          <Vector3 name="size">
+            <X>18</X>
+            <Y>0.2</Y>
+            <Z>8</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+      <Item class="Part" referent="58">
+        <Properties>
+          <string name="Name">Music Cafe booth</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>40</X>
+            <Y>2</Y>
+            <Z>-62</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">7688869</Color3uint8>
+          <Vector3 name="size">
+            <X>5</X>
+            <Y>3</Y>
+            <Z>3</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+        <Item class="ProximityPrompt" referent="59">
+          <Properties>
+            <string name="Name">ProximityPrompt</string>
+            <string name="ActionText">Discover local talent</string>
+            <float name="MaxActivationDistance">10</float>
+            <string name="ObjectText">Music Cafe</string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="Part" referent="60">
+        <Properties>
+          <string name="Name">Music Cafe stage</string>
+          <bool name="Anchored">true</bool>
+          <token name="BottomSurface">0</token>
+          <CoordinateFrame name="CFrame">
+            <X>40</X>
+            <Y>1</Y>
+            <Z>-59</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="CanCollide">true</bool>
+          <Color3uint8 name="Color3uint8">6181491</Color3uint8>
+          <Vector3 name="size">
+            <X>12</X>
+            <Y>1</Y>
+            <Z>6</Z>
+          </Vector3>
+          <token name="TopSurface">0</token>
+        </Properties>
+      </Item>
+    </Item>
   </Item>
 </roblox>

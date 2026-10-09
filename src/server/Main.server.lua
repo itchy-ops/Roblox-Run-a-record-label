@@ -307,43 +307,23 @@ task.spawn(function()
         for id, bid in pairs(bids) do if bid.expires <= os.time() then bids[id] = nil end end
     end
 end)
-local function part(name, size, pos, color)
-    local obj = Instance.new("Part")
-    obj.Name, obj.Size, obj.Position, obj.Color = name, size, pos, color
-    obj.Anchored = true; obj.TopSurface = Enum.SurfaceType.Smooth; obj.Parent = workspace
-    return obj
-end
-part("Town Ground", Vector3.new(240, 1, 240), Vector3.new(0, -1, 0), Color3.fromRGB(63, 91, 77))
-part("Main Street", Vector3.new(22, 0.2, 200), Vector3.new(0, -0.35, 0), Color3.fromRGB(42, 44, 54))
-local spawn = Instance.new("SpawnLocation")
-spawn.Position = Vector3.new(0, 1, 65); spawn.Anchored = true; spawn.Neutral = true; spawn.Parent = workspace
-local locations = {{"Your Studio", Vector3.new(-40, 0, 45)}, {"Open Mic", Vector3.new(40, 0, 25)},
-    {"Park Stage", Vector3.new(-40, 0, -25)}, {"Music Cafe", Vector3.new(40, 0, -55)}}
-for i, entry in ipairs(locations) do
-    local name, pos = entry[1], entry[2]
-    local floor = part(name, Vector3.new(30, 1, 26), pos, Color3.fromRGB(65 + i * 20, 62, 94))
-    part(name .. " rear wall", Vector3.new(30, 12, 1), pos + Vector3.new(0, 6, -13), Color3.fromRGB(44, 49, 65))
-    for _, x in ipairs({-15, 15}) do part(name .. " wall", Vector3.new(1, 12, 26), pos + Vector3.new(x, 6, 0), Color3.fromRGB(44, 49, 65)) end
-    local sign = Instance.new("BillboardGui")
-    sign.Size = UDim2.fromOffset(220, 50); sign.StudsOffset = Vector3.new(0, 13, 0); sign.AlwaysOnTop = true; sign.Parent = floor
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1, 1); label.BackgroundTransparency = 1; label.Text = name
-    label.TextColor3 = Color3.new(1, 1, 1); label.TextScaled = true; label.Parent = sign
-    local booth = part(name .. " booth", Vector3.new(5, 3, 3), pos + Vector3.new(0, 2, -7), Color3.fromRGB(117, 82, 165))
-    local prompt = Instance.new("ProximityPrompt")
-    prompt.ActionText = i == 1 and "Check studio" or "Discover local talent"
-    prompt.ObjectText = name; prompt.MaxActivationDistance = 10; prompt.Parent = booth
+-- The town is serialized in Workspace, so it also appears in Studio edit mode.
+local town = workspace:WaitForChild("Town")
+for index, name in ipairs({"Your Studio", "Open Mic", "Park Stage", "Music Cafe"}) do
+    local booth = town:WaitForChild(name .. " booth")
+    local prompt = booth:WaitForChild("ProximityPrompt")
     prompt.Triggered:Connect(function(player)
         local p = profiles[player]; if not p then return end
-        if i == 1 then note(p, "Studio level " .. p.studio .. ". Open your phone to repair and manage artists."); return end
         local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
         if not root or (root.Position - booth.Position).Magnitude > 15 then return end
+        if index == 1 then
+            note(p, "Studio level " .. p.studio .. ". Open your phone to repair and manage artists.")
+            return
+        end
         local n = 0
-        for _, a in ipairs(p.artists) do if a.location == name and not a.discovered then a.discovered = true; n = n + 1 end end
+        for _, a in ipairs(p.artists) do
+            if a.location == name and not a.discovered then a.discovered = true; n = n + 1 end
+        end
         note(p, "Discovered " .. n .. " artists at " .. name .. ". Open your phone.")
     end)
-    if i == 1 then
-        part("Battered mixing desk", Vector3.new(8, 2, 4), pos + Vector3.new(-7, 2, 3), Color3.fromRGB(75, 65, 57))
-        part("Old microphone", Vector3.new(0.4, 5, 0.4), pos + Vector3.new(7, 3, 0), Color3.fromRGB(105, 105, 105))
-    end
 end

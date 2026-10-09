@@ -4,7 +4,7 @@ A playable Roblox management prototype based on the supplied design conversation
 
 ## Open and play
 
-The generated place is [**build/RecordLabel.rbxlx**](build/RecordLabel.rbxlx). Download it and open it with Roblox Studio, then press **Play**. No third-party assets or plugins are required to play the built place.
+The generated place is [**build/RecordLabel.rbxlx**](build/RecordLabel.rbxlx). Download it and open it with Roblox Studio, The town is included in the file and visible in Studio edit mode. Press **Play** to start the phone and gameplay. No third-party assets or plugins are required to play the built place.
 
 Your phone opens automatically. Use **P** or the Phone button to hide it while walking around town. Visit Open Mic, Park Stage, and Music Cafe discovery booths, or search the Feed. Repair your studio, scout an artist, and submit a contract offer. Roster contains recording, album, touring, promotion, and AI buyout actions. Inbox shows career and negotiation messages. Market shows other online players' contracts and lets owners approve buyouts.
 
@@ -53,4 +53,4 @@ Automated checks exercise the actual economy, server request handlers, profile s
 
 See [the Studio smoke-test checklist](tests/STUDIO_CHECKLIST.md) for the remaining engine checks. Linux cloud tooling cannot run Roblox Studio, so those checks have not been executed here.
 
-This is a first playable prototype, not a finished commercial game. The town and studio use simple generated geometry; artist profiles represent performers without animated NPC rigs, recorded music, custom character art, or a real external social network. Releases and tours are management campaigns rather than minigames. Artists are unique to each label's discovery pool until traded. Expired artists become available for their current label to renegotiate; a shared cross-server free-agent auction is not implemented. Marketplace listings cover players in the same server. Balancing, art/audio, accessibility/device testing, and production load testing remain before release.
+This is a first playable prototype, not a finished commercial game. The town and studio use simple generated geometry serialized into the place before scripts run; artist profiles represent performers without animated NPC rigs, recorded music, custom character art, or a real external social network. Releases and tours are management campaigns rather than minigames. Artists are unique to each label's discovery pool until traded. Expired artists become available for their current label to renegotiate; a shared cross-server free-agent auction is not implemented. Marketplace listings cover players in the same server. Balancing, art/audio, accessibility/device testing, and production load testing remain before release.

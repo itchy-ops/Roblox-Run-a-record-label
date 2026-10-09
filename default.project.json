@@ -2,10 +2,36 @@
   "name": "RecordLabel",
   "tree": {
     "$className": "DataModel",
-    "ReplicatedStorage": {"Shared": {"$path": "src/shared"}},
-    "ServerScriptService": {"Game": {"$path": "src/server"}},
-    "StarterPlayer": {"StarterPlayerScripts": {"Phone": {"$path": "src/client"}}},
-    "Workspace": {"$properties": {"FilteringEnabled": true}},
-    "Lighting": {"$properties": {"ClockTime": 16, "Brightness": 2}}
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "Game": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Phone": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      },
+      "Town": {
+        "$path": "assets/Town.rbxmx"
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "ClockTime": 16,
+        "Brightness": 2
+      }
+    }
   }
 }

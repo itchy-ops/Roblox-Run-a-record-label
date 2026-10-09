@@ -15,7 +15,13 @@ Vector3 = {new = function(x,y,z) return setmetatable({x=x,y=y,z=z}, vector) end}
 UDim2 = {fromOffset = function() return {} end, fromScale = function() return {} end}
 Color3 = {fromRGB = function() return {} end, new = function() return {} end}
 Enum = {SurfaceType = {Smooth = 1}}
-workspace = {}
+local booths = {}
+local town = {WaitForChild = function(_, name) return booths[name] end}
+for _, name in ipairs({'Your Studio', 'Open Mic', 'Park Stage', 'Music Cafe'}) do
+    local prompt = {Triggered = event()}
+    booths[name .. ' booth'] = {Position = Vector3.new(0,0,0), WaitForChild = function() return prompt end}
+end
+workspace = {WaitForChild = function(_, name) assert(name == 'Town'); return town end}
 local remote
 Instance = {new = function(class)
     local o = {ClassName = class}
