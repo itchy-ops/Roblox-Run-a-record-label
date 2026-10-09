@@ -4,8 +4,13 @@ A playable Roblox management prototype based on the supplied design conversation
 
 ## Open and play
 
-The generated place is [**build/RecordLabel.rbxlx**](build/RecordLabel.rbxlx). Download it and open it with Roblox Studio, The town is included in the file and visible in Studio edit mode. Press **Play** to start the phone and gameplay. No third-party assets or plugins are required to play the built place.
+Download [**build/RecordLabel.rbxl**](build/RecordLabel.rbxl) using GitHub's **Download raw file** button. In Roblox Studio, use **File → Open from File** and select that downloaded `.rbxl` file. Open the complete place file rather than importing it as a model into an empty Baseplate.
 
+Before pressing Play, expand **Workspace** in Explorer. You should see **Town**, containing **Town Ground**, **Town Spawn**, and the buildings. Select Town and press **F** to frame the map. **Terrain** alone is not the town. Then press **Play** to start the phone and gameplay. The XML alternative is [build/RecordLabel.rbxlx](build/RecordLabel.rbxlx).
+
+If an already-open copy is missing Town, [build/RestoreTown.lua](build/RestoreTown.lua) can restore the geometry and spawn: stop Play, open **Command Bar** from Studio's View tools, paste the script's entire contents, and execute it. Save the place. This helper restores the map only; use the complete `.rbxl` file if game scripts are also missing.
+
+An independent `World` server script verifies and restores all 32 map parts, enables the spawn, and assigns players to it even if the saving system fails. Output prints **RecordLabel Map fix 3: 32 anchored map parts ready**.
 Your phone opens automatically. Use **P** or the Phone button to hide it while walking around town. Visit Open Mic, Park Stage, and Music Cafe discovery booths, or search the Feed. Repair your studio, scout an artist, and submit a contract offer. Roster contains recording, album, touring, promotion, and AI buyout actions. Inbox shows career and negotiation messages. Market shows other online players' contracts and lets owners approve buyouts.
 
 ## Build and validate in the cloud

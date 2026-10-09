@@ -1,6 +1,7 @@
 """Create an editable Roblox town model, included in the place before scripts run."""
 from pathlib import Path
 import xml.etree.ElementTree as ET
+import json
 
 root = ET.Element('roblox', version='4')
 serial = 0
@@ -28,9 +29,12 @@ def vec(values):
 def color(values):
     return dict(zip(('R', 'G', 'B'), (v / 255 for v in values)))
 
+definitions = []
+
 town, _ = item(root, 'Model', 'Town')
 
 def part(name, size, position, rgb, kind='Part'):
+    definitions.append(dict(name=name, size=size, position=position, color=rgb, kind=kind))
     obj, p = item(town, kind, name)
     prop(p, 'bool', 'Anchored', True)
     prop(p, 'bool', 'CanCollide', True)
@@ -47,7 +51,8 @@ part('Town Ground', (240, 1, 240), (0, -1, 0), (63, 91, 77))
 part('Main Street', (22, .2, 200), (0, -.35, 0), (42, 44, 54))
 _, spawn = part('Town Spawn', (8, 1, 8), (0, 1, 65), (112, 82, 213), 'SpawnLocation')
 prop(spawn, 'bool', 'Neutral', True)
-prop(spawn, 'float', 'Duration', 0)
+prop(spawn, 'bool', 'Enabled', True)
+prop(spawn, 'int', 'Duration', 0)
 locations = [('Your Studio', -40, 45), ('Open Mic', 40, 25), ('Park Stage', -40, -25), ('Music Cafe', 40, -55)]
 for index, (name, x, z) in enumerate(locations, 1):
     floor, _ = part(name, (30, 1, 26), (x, 0, z), (65 + index * 20, 62, 94))
@@ -81,3 +86,16 @@ path = Path(__file__).resolve().parents[1] / 'assets' / 'Town.rbxmx'
 ET.indent(root)
 ET.ElementTree(root).write(path, encoding='utf-8', xml_declaration=True)
 print(f'Built editable town model ({serial} instances)')
+
+# Generate the independent runtime fallback from the same geometry definitions.
+def lua(value):
+    if isinstance(value, str): return json.dumps(value)
+    if isinstance(value, dict): return "{" + ",".join(k + "=" + lua(v) for k,v in value.items()) + "}"
+    if isinstance(value, (list, tuple)): return "{" + ",".join(lua(v) for v in value) + "}"
+    return str(value)
+repo = Path(__file__).resolve().parents[1]
+bootstrap = (repo / 'tools' / 'world_bootstrap.lua').read_text().replace('__PART_DEFINITIONS__', lua(definitions))
+(repo / 'src' / 'server' / 'World.server.lua').write_text(bootstrap)
+# This can also be pasted into Studio's Command Bar to restore the map in an
+# already-open place, without loading a different file or replacing game scripts.
+(repo / 'build' / 'RestoreTown.lua').write_text(bootstrap)

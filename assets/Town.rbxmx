@@ -102,7 +102,8 @@
         <token name="TopSurface">0</token>
         <token name="BottomSurface">0</token>
         <bool name="Neutral">true</bool>
-        <float name="Duration">0</float>
+        <bool name="Enabled">true</bool>
+        <int name="Duration">0</int>
       </Properties>
     </Item>
     <Item class="Part" referent="RBX5">

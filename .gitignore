@@ -1,5 +1,7 @@
 build/*
 !build/RecordLabel.rbxlx
+!build/RecordLabel.rbxl
+!build/RestoreTown.lua
 .tools/
 node_modules/
 *.rbxl.lock

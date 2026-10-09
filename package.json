@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "test": "node tests/syntax.cjs && fengari tests/economy.lua && fengari tests/server.lua && fengari tests/persistence.lua",
-    "build": "python3 tools/build_town.py && .tools/rojo build default.project.json -o build/RecordLabel.rbxlx && python3 tests/place.py"
+    "test": "node tests/syntax.cjs && fengari tests/economy.lua && fengari tests/server.lua && fengari tests/persistence.lua && fengari tests/world.lua",
+    "build": "python3 tools/build_town.py && .tools/rojo build default.project.json -o build/RecordLabel.rbxlx && .tools/rojo build default.project.json -o build/RecordLabel.rbxl && python3 tests/place.py"
   },
   "devDependencies": {
     "fengari-node-cli": "0.1.0",

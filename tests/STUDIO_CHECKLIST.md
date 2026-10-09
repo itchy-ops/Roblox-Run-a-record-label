@@ -2,7 +2,7 @@
 
 These are manual engine checks; they have not been run by the Linux test harness.
 
-1. Open `build/RecordLabel.rbxlx` and confirm the Town model, buildings, and spawn are visible before Play. Then Play. Confirm the town, spawn, discovery booths, and Phone render. Walk to all locations. Check Output for errors.
+1. Download and open `build/RecordLabel.rbxl` with File → Open from File and confirm the Town model, buildings, and spawn are visible before Play. Then Play. Confirm the town, spawn, discovery booths, and Phone render. Walk to all locations. Check Output for errors and the “RecordLabel Map fix 3: 32 anchored map parts ready” startup message. Confirm the character stands on the purple Town Spawn, not in a void.
 2. Confirm initial cash is $5,000 and Studio is level 0. Hide/show the phone with P and the button. Check a narrow mobile emulator and scroll through a contract form.
 3. Search Feed, inspect a solo artist and a band, and discover artists at a town booth. Potential and exact skill/consistency must remain hidden initially.
 4. Upgrade scouting, pay for a report, and verify the range narrows. Repeated reports must not reveal the exact potential.
